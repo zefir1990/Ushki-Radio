@@ -9,7 +9,7 @@
 
 - **Web Version**: [Available online](https://demensdeum.com/software/ushki-radio)
 - **Standalone Versions**: Available at the [releases page](https://github.com/demensdeum/Ushki-Radio/releases) (Native version packed by [Pake](https://github.com/tw93/Pake))
-
+- **Google Play Version**: Avaiable at the [Google Play](https://play.google.com/store/apps/details?id=com.demensdeum.ushkiradio)
 
 ## Features
 
