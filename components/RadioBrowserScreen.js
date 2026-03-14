@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { List, Searchbar, Divider, Text, Surface, useTheme, IconButton } from 'react-native-paper';
 import RadioService from './RadioService';
 import FavoritesService from './FavoritesService';
+import AvailabilityService from '../services/AvailabilityService';
 import i18n from '../i18n';
 
 const RadioBrowserScreen = ({ playStation, currentStation, isPlaying, isAudioLoading, favorites, toggleFavorite }) => {
@@ -19,6 +20,24 @@ const RadioBrowserScreen = ({ playStation, currentStation, isPlaying, isAudioLoa
     const INITIAL_LIMIT = 20;
 
     const isFirstRun = useRef(true);
+    const [availabilityTrigger, setAvailabilityTrigger] = useState(0);
+
+    useEffect(() => {
+        const unsubscribe = AvailabilityService.subscribe(() => {
+            setAvailabilityTrigger(prev => prev + 1);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+        const stations = viewableItems.map(item => item.item).filter(item => item && item.stationuuid);
+        AvailabilityService.updateViewableStations(stations);
+    }, []);
+
+    const viewabilityConfig = useRef({
+        itemVisiblePercentThreshold: 50,
+        minimumViewTime: 300,
+    }).current;
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -99,6 +118,19 @@ const RadioBrowserScreen = ({ playStation, currentStation, isPlaying, isAudioLoa
         const isThisStationPlaying = currentStation?.stationuuid === item.stationuuid;
         const isFav = favorites.has(item.stationuuid);
 
+        const status = AvailabilityService.getStatus(item.url_resolved || item.url);
+        let statusColor;
+        switch (status) {
+            case 'online':
+                statusColor = '#4CAF50'; // Green
+                break;
+            case 'offline':
+                statusColor = '#F44336'; // Red
+                break;
+            default:
+                statusColor = '#FFC107'; // Yellow
+        }
+
         return (
             <List.Item
                 title={item.name}
@@ -129,6 +161,7 @@ const RadioBrowserScreen = ({ playStation, currentStation, isPlaying, isAudioLoa
                                 })}
                             </View>
                         ) : null}
+                        <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
                         <IconButton
                             icon={isFav ? "heart" : "heart-outline"}
                             iconColor={isFav ? theme.colors.primary : theme.colors.outline}
@@ -174,6 +207,9 @@ const RadioBrowserScreen = ({ playStation, currentStation, isPlaying, isAudioLoa
                         ListFooterComponent={renderFooter}
                         onRefresh={handleRefresh}
                         refreshing={refreshing}
+                        onViewableItemsChanged={onViewableItemsChanged}
+                        viewabilityConfig={viewabilityConfig}
+                        extraData={availabilityTrigger}
                     />
                 )}
             </View>
@@ -222,6 +258,12 @@ const styles = StyleSheet.create({
     },
     tagText: {
         fontSize: 10,
+    },
+    statusIndicator: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 4,
     },
 });
 

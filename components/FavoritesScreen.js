@@ -1,13 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { List, Divider, Text, Surface, useTheme, IconButton } from 'react-native-paper';
 import FavoritesService from './FavoritesService';
+import AvailabilityService from '../services/AvailabilityService';
 import i18n from '../i18n';
 
 const FavoritesScreen = ({ playStation, currentStation, isPlaying, isAudioLoading, toggleFavorite, favorites: favSet }) => {
     const theme = useTheme();
     const [favorites, setFavorites] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [availabilityTrigger, setAvailabilityTrigger] = useState(0);
+
+    useEffect(() => {
+        const unsubscribe = AvailabilityService.subscribe(() => {
+            setAvailabilityTrigger(prev => prev + 1);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+        const stations = viewableItems.map(item => item.item).filter(item => item && item.stationuuid);
+        AvailabilityService.updateViewableStations(stations);
+    }, []);
+
+    const viewabilityConfig = useRef({
+        itemVisiblePercentThreshold: 50,
+        minimumViewTime: 300,
+    }).current;
 
     const loadFavorites = useCallback(async () => {
         setLoading(true);
@@ -27,6 +46,19 @@ const FavoritesScreen = ({ playStation, currentStation, isPlaying, isAudioLoadin
 
     const renderItem = ({ item }) => {
         const isThisStationPlaying = currentStation?.stationuuid === item.stationuuid;
+
+        const status = AvailabilityService.getStatus(item.url_resolved || item.url);
+        let statusColor;
+        switch (status) {
+            case 'online':
+                statusColor = '#4CAF50'; // Green
+                break;
+            case 'offline':
+                statusColor = '#F44336'; // Red
+                break;
+            default:
+                statusColor = '#FFC107'; // Yellow
+        }
 
         return (
             <List.Item
@@ -58,6 +90,7 @@ const FavoritesScreen = ({ playStation, currentStation, isPlaying, isAudioLoadin
                                 })}
                             </View>
                         ) : null}
+                        <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
                         <IconButton
                             icon="heart"
                             iconColor={theme.colors.primary}
@@ -95,6 +128,9 @@ const FavoritesScreen = ({ playStation, currentStation, isPlaying, isAudioLoadin
                     contentContainerStyle={[styles.list, currentStation && styles.listWithPanel]}
                     onRefresh={loadFavorites}
                     refreshing={loading}
+                    onViewableItemsChanged={onViewableItemsChanged}
+                    viewabilityConfig={viewabilityConfig}
+                    extraData={availabilityTrigger}
                 />
             )}
         </View>
@@ -139,6 +175,12 @@ const styles = StyleSheet.create({
     },
     tagText: {
         fontSize: 10,
+    },
+    statusIndicator: {
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        marginRight: 4,
     },
 });
 
