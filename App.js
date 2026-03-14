@@ -94,10 +94,14 @@ function AppContent() {
   }, [loadFavorites, loadSettingsSource]);
 
   useEffect(() => {
-    if (player) {
-      player.volume = volume;
+    if (player && status.isLoaded) {
+      try {
+        player.volume = volume;
+      } catch (e) {
+        console.error('Error setting volume in useEffect:', e);
+      }
     }
-  }, [volume, player]);
+  }, [volume, player, status.isLoaded]);
 
   useEffect(() => {
     if (player && currentStation) {
@@ -129,6 +133,11 @@ function AppContent() {
       if (currentStation?.stationuuid === station.stationuuid) {
         togglePlayback();
         return;
+      }
+
+      if (player) {
+        player.pause();
+        player.setActiveForLockScreen(false);
       }
 
       setCurrentStation(station);
@@ -172,8 +181,12 @@ function AppContent() {
 
   const onVolumeChange = (value) => {
     setVolume(value);
-    if (player) {
-      player.volume = value;
+    if (player && status.isLoaded) {
+      try {
+        player.volume = value;
+      } catch (e) {
+        console.error('Error setting volume in onVolumeChange:', e);
+      }
     }
     try {
       AsyncStorage.setItem(VOLUME_KEY, value.toString());
